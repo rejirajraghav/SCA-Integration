@@ -1,0 +1,48 @@
+{
+  "index_patterns": ["security-sca-findings*"],
+  "priority": 500,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "30s"
+    },
+    "mappings": {
+      "dynamic": false,
+      "_meta": {
+        "description": "SCA vulnerability findings. One doc per CVE per service. Owner: sca-correlation-transform.",
+        "managed_by": "sca-findings-enrich pipeline + sca-correlation-transform"
+      },
+      "properties": {
+        "@timestamp":                { "type": "date" },
+        "event.ingested":            { "type": "date" },
+        "event.kind":                { "type": "keyword" },
+        "finding.id":                { "type": "keyword" },
+        "finding.status":            { "type": "keyword" },
+        "finding.first_seen":        { "type": "date" },
+        "finding.last_seen":         { "type": "date" },
+        "finding.fixed_at":          { "type": "date" },
+        "vulnerability.id":          { "type": "keyword" },
+        "vulnerability.cve_id":      { "type": "keyword" },
+        "vulnerability.severity":    { "type": "keyword" },
+        "vulnerability.cvss_vector": { "type": "keyword" },
+        "vulnerability.cvss_type":   { "type": "keyword" },
+        "vulnerability.cwe_ids":     { "type": "keyword" },
+        "vulnerability.fix_version": { "type": "keyword" },
+        "vulnerability.published_at":{ "type": "date" },
+        "library.purl":              { "type": "keyword" },
+        "library.purl_base":         { "type": "keyword" },
+        "library.name":              { "type": "keyword" },
+        "library.group_id":          { "type": "keyword" },
+        "library.version":           { "type": "keyword" },
+        "library.sha1":              { "type": "keyword" },
+        "library.language":          { "type": "keyword" },
+        "service.name":              { "type": "keyword" },
+        "service.version":           { "type": "keyword" },
+        "deployment.environment":    { "type": "keyword" },
+        "host.name":                 { "type": "keyword" },
+        "container.id":              { "type": "keyword" }
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "index_patterns": ["security-osv-vulns*"],
+  "priority": 500,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "30s",
+      "index.lifecycle.name": "security-reference-data-policy"
+    },
+    "mappings": {
+      "dynamic": false,
+      "_meta": {
+        "description": "OSV vulnerability reference data. One doc per GHSA/CVE ID.",
+        "owner": "fleet-custom-api-osv-sync",
+        "managed_by": "osv-vuln-ingest pipeline"
+      },
+      "properties": {
+        "@timestamp":                        { "type": "date" },
+        "event.ingested":                    { "type": "date" },
+        "event.kind":                        { "type": "keyword" },
+        "event.category":                    { "type": "keyword" },
+        "event.type":                        { "type": "keyword" },
+        "vulnerability.id":                  { "type": "keyword" },
+        "vulnerability.cve_id":              { "type": "keyword" },
+        "vulnerability.aliases":             { "type": "keyword" },
+        "vulnerability.summary": {
+          "type": "text",
+          "fields": { "keyword": { "type": "keyword", "ignore_above": 512 } }
+        },
+        "vulnerability.severity":            { "type": "keyword" },
+        "vulnerability.cvss_vector":         { "type": "keyword" },
+        "vulnerability.cvss_type":           { "type": "keyword" },
+        "vulnerability.cwe_ids":             { "type": "keyword" },
+        "vulnerability.ecosystem":           { "type": "keyword" },
+        "vulnerability.affected_packages":   { "type": "keyword" },
+        "vulnerability.affected_purls":      { "type": "keyword" },
+        "vulnerability.purl_bases":          { "type": "keyword" },
+        "vulnerability.vulnerable_versions": { "type": "keyword" },
+        "vulnerability.fix_version":         { "type": "keyword" },
+        "vulnerability.fix_versions":        { "type": "keyword" },
+        "vulnerability.github_reviewed":     { "type": "boolean" },
+        "vulnerability.published_at":        { "type": "date" },
+        "vulnerability.modified_at":         { "type": "date" },
+        "vulnerability.advisory_urls":       { "type": "keyword" },
+        "vulnerability.fix_urls":            { "type": "keyword" },
+        "error.message":                     { "type": "text" },
+        "error.pipeline":                    { "type": "keyword" }
+      }
+    }
+  }
+}

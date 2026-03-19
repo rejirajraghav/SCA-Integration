@@ -1,0 +1,37 @@
+{
+  "description": "Enrich grouped library rows with CVE data. Writes one finding per CVE match. Owner: sca-correlation-transform.",
+  "processors": [
+    {
+      "enrich": {
+        "policy_name": "osv-purl-enrich-policy",
+        "field": "library.purl_base",
+        "target_field": "_vuln_match",
+        "ignore_missing": true,
+        "override": false
+      }
+    },
+    {
+      "script": {
+        "lang": "painless",
+        "description": "Check version match and promote vuln fields if matched",
+        "source": "def match = ctx._vuln_match; if (match == null) { ctx._drop = true; return; } def vuln_versions = match['vulnerability.vulnerable_versions']; def lib_ver = ctx['library.version']; if (vuln_versions == null || !vuln_versions.contains(lib_ver)) { ctx._drop = true; return; } ctx['vulnerability.id']           = match['vulnerability.id']; ctx['vulnerability.cve_id']       = match['vulnerability.cve_id']; ctx['vulnerability.severity']     = match['vulnerability.severity']; ctx['vulnerability.cvss_vector']  = match['vulnerability.cvss_vector']; ctx['vulnerability.cvss_type']    = match['vulnerability.cvss_type']; ctx['vulnerability.cwe_ids']      = match['vulnerability.cwe_ids']; ctx['vulnerability.fix_version']  = match['vulnerability.fix_version']; ctx['vulnerability.published_at'] = match['vulnerability.published_at']; ctx['finding.status'] = 'open'; ctx._drop = false;"
+      }
+    },
+    { "drop": { "if": "ctx._drop == true" } },
+    {
+      "fingerprint": {
+        "fields": ["library.purl_base", "library.version", "vulnerability.id", "service.name"],
+        "target_field": "finding.id",
+        "method": "SHA-256"
+      }
+    },
+    { "set": { "field": "_id",            "value": "{{finding.id}}" } },
+    { "set": { "field": "@timestamp",     "value": "{{{_ingest.timestamp}}}" } },
+    { "set": { "field": "event.ingested", "value": "{{{_ingest.timestamp}}}" } },
+    { "set": { "field": "event.kind",     "value": "alert" } },
+    { "remove": { "field": ["_vuln_match", "_drop"], "ignore_missing": true } }
+  ],
+  "on_failure": [
+    { "set": { "field": "error.message", "value": "{{_ingest.on_failure_message}}" } }
+  ]
+}
