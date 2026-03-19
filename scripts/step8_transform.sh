@@ -12,7 +12,7 @@ echo "  STEP 8 — sca-correlation-transform"
 echo "═══════════════════════════════════════════"
 
 info "Creating transform: sca-correlation-transform"
-RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/_transform/sca-correlation-transform" \
   -H "Content-Type: application/json" \
   -d "{
@@ -71,7 +71,7 @@ echo "$RES" | jq .
 ok "Transform created"
 
 info "Starting transform..."
-START=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+START=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X POST "${ES_HOST}/_transform/sca-correlation-transform/_start")
 echo "$START" | jq .
 ok "Transform started"
@@ -79,7 +79,7 @@ ok "Transform started"
 info "Monitoring for 3 minutes (6 x 30s checks)..."
 for i in 1 2 3 4 5 6; do
   echo "=== Check ${i} ($(date)) ==="
-  STATS=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+  STATS=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
     "${ES_HOST}/_transform/sca-correlation-transform/_stats")
   echo "$STATS" | jq '.transforms[0] | {
     state:           .state,

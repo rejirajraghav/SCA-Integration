@@ -12,7 +12,7 @@ echo "  STEP 2 — osv-vuln-ingest pipeline"
 echo "═══════════════════════════════════════════"
 
 info "Creating ingest pipeline: osv-vuln-ingest"
-RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/_ingest/pipeline/osv-vuln-ingest" \
   -H "Content-Type: application/json" \
   -d @"$(dirname "$0")/../pipelines/osv-vuln-ingest.json")
@@ -29,7 +29,7 @@ curl -sf -X POST "https://api.osv.dev/v1/query" \
 
 FIRST_VULN=$(jq -c '.vulns[0]' /tmp/osv_response.json)
 
-SIM=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+SIM=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X POST "${ES_HOST}/_ingest/pipeline/osv-vuln-ingest/_simulate" \
   -H "Content-Type: application/json" \
   -d "{\"docs\": [{\"_source\": ${FIRST_VULN}}]}")

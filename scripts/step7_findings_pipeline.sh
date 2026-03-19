@@ -12,7 +12,7 @@ echo "  STEP 7 — sca-findings-enrich pipeline"
 echo "═══════════════════════════════════════════"
 
 info "Creating ingest pipeline: sca-findings-enrich"
-RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/_ingest/pipeline/sca-findings-enrich" \
   -H "Content-Type: application/json" \
   -d @"$(dirname "$0")/../pipelines/sca-findings-enrich.json")

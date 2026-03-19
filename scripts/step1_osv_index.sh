@@ -13,7 +13,7 @@ echo "════════════════════════�
 
 # ILM policy
 info "Creating ILM policy: security-reference-data-policy"
-RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/_ilm/policy/security-reference-data-policy" \
   -H "Content-Type: application/json" \
   -d '{
@@ -33,7 +33,7 @@ ok "ILM policy created"
 
 # Index template
 info "Creating index template: security-osv-vulns-template"
-RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/_index_template/security-osv-vulns-template" \
   -H "Content-Type: application/json" \
   -d @"$(dirname "$0")/../mappings/security-osv-vulns.json")
@@ -43,7 +43,7 @@ ok "Index template created"
 
 # Create index
 info "Creating index: security-osv-vulns"
-RES=$(curl -s -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -s -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/security-osv-vulns" \
   -H "Content-Type: application/json" \
   -d '{"aliases": {"security-osv-vulns-latest": {"is_write_index": true}}}')

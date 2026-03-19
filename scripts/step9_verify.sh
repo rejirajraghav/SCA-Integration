@@ -12,27 +12,27 @@ echo "  STEP 9 — Verify findings"
 echo "═══════════════════════════════════════════"
 
 info "security-osv-vulns count:"
-curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/security-osv-vulns/_count" | jq .count
+curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" "${ES_HOST}/security-osv-vulns/_count" | jq .count
 
 info "security-sca-findings count:"
-FINDINGS=$(curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/security-sca-findings/_count" | jq .count)
+FINDINGS=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" "${ES_HOST}/security-sca-findings/_count" | jq .count)
 echo "$FINDINGS"
 [ "$FINDINGS" = "0" ] || [ "$FINDINGS" = "null" ] && fail "security-sca-findings is empty — check transform and enrich pipeline"
 
 info "Findings by severity:"
-curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/security-sca-findings/_search" \
+curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" "${ES_HOST}/security-sca-findings/_search" \
   -H "Content-Type: application/json" \
   -d '{"size":0,"aggs":{"by_severity":{"terms":{"field":"vulnerability.severity"}}}}' \
   | jq '[.aggregations.by_severity.buckets[] | {severity: .key, count: .doc_count}]'
 
 info "Findings by service:"
-curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/security-sca-findings/_search" \
+curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" "${ES_HOST}/security-sca-findings/_search" \
   -H "Content-Type: application/json" \
   -d '{"size":0,"aggs":{"by_service":{"terms":{"field":"service.name","size":20}}}}' \
   | jq '[.aggregations.by_service.buckets[] | {service: .key, findings: .doc_count}]'
 
 info "All CVEs for log4j-core (if present):"
-curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/security-sca-findings/_search" \
+curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" "${ES_HOST}/security-sca-findings/_search" \
   -H "Content-Type: application/json" \
   -d '{
     "query": {"term": {"library.name": "log4j-core"}},
@@ -41,7 +41,7 @@ curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/security-sca-findings/_search" 
   }' | jq '[.hits.hits[]._source]'
 
 info "One full CRITICAL finding:"
-curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/security-sca-findings/_search" \
+curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" "${ES_HOST}/security-sca-findings/_search" \
   -H "Content-Type: application/json" \
   -d '{"size":1,"query":{"term":{"vulnerability.severity":"CRITICAL"}}}' \
   | jq '.hits.hits[0]._source'

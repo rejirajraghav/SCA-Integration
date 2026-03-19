@@ -12,7 +12,7 @@ echo "  STEP 6 — osv-purl-enrich-policy"
 echo "═══════════════════════════════════════════"
 
 info "Creating enrich policy: osv-purl-enrich-policy"
-RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/_enrich/policy/osv-purl-enrich-policy" \
   -H "Content-Type: application/json" \
   -d '{
@@ -37,12 +37,12 @@ echo "$RES" | jq .
 ok "Enrich policy created"
 
 info "Executing enrich policy (building internal index)..."
-curl -sf -u "elastic:${ES_PASSWORD}" \
+curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X POST "${ES_HOST}/_enrich/policy/osv-purl-enrich-policy/_execute" | jq .
 
 info "Polling for COMPLETE status..."
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  STATUS=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+  STATUS=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
     "${ES_HOST}/_enrich/policy/osv-purl-enrich-policy" \
     | jq -r '.policies[0].config.match.status // "pending"')
   echo "  Attempt ${i}: ${STATUS}"

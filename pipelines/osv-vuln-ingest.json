@@ -1,59 +1,163 @@
 {
   "description": "Normalize OSV /v1/query response into security-osv-vulns index. Owner: SCA pipeline.",
   "processors": [
-    { "rename": { "field": "id",                         "target_field": "vulnerability.id",          "ignore_missing": true } },
-    { "rename": { "field": "aliases",                    "target_field": "vulnerability.aliases",     "ignore_missing": true } },
-    { "rename": { "field": "summary",                    "target_field": "vulnerability.summary",     "ignore_missing": true } },
-    { "rename": { "field": "published",                  "target_field": "vulnerability.published_at","ignore_missing": true } },
-    { "rename": { "field": "modified",                   "target_field": "vulnerability.modified_at", "ignore_missing": true } },
-    { "rename": { "field": "database_specific.severity", "target_field": "vulnerability.severity",    "ignore_missing": true } },
-    { "rename": { "field": "database_specific.cwe_ids",  "target_field": "vulnerability.cwe_ids",     "ignore_missing": true } },
-    { "rename": { "field": "database_specific.github_reviewed", "target_field": "vulnerability.github_reviewed", "ignore_missing": true } },
     {
       "script": {
         "lang": "painless",
-        "description": "Extract CVSS vector and type from severity array",
-        "source": "if (ctx.severity != null && ctx.severity.length > 0) { ctx['vulnerability.cvss_vector'] = ctx.severity[0].score; ctx['vulnerability.cvss_type'] = ctx.severity[0].type; }"
+        "description": "Extract simple fields as flat dotted keys (consistent with script-based field access)",
+        "source": "
+          ctx['vulnerability.id']       = ctx.containsKey('id')      ? ctx.id      : null;
+          ctx['vulnerability.aliases']  = ctx.containsKey('aliases')  ? ctx.aliases : null;
+          ctx['vulnerability.summary']  = ctx.containsKey('summary')  ? ctx.summary : null;
+          ctx['vulnerability.published_at'] = ctx.containsKey('published') ? ctx.published : null;
+          ctx['vulnerability.modified_at']  = ctx.containsKey('modified')  ? ctx.modified  : null;
+
+          if (ctx.containsKey('database_specific')) {
+            def ds = ctx.database_specific;
+            if (ds.containsKey('severity'))        ctx['vulnerability.severity']        = ds.severity;
+            if (ds.containsKey('cwe_ids'))          ctx['vulnerability.cwe_ids']         = ds.cwe_ids;
+            if (ds.containsKey('github_reviewed'))  ctx['vulnerability.github_reviewed'] = ds.github_reviewed;
+          }
+
+          ctx['vulnerability.ecosystem'] = 'Maven';
+          ctx['event.kind']     = 'enrichment';
+          ctx['event.category'] = 'vulnerability';
+          ctx['event.type']     = 'info';
+
+          ctx.remove('id');
+          ctx.remove('aliases');
+          ctx.remove('summary');
+          ctx.remove('published');
+          ctx.remove('modified');
+          ctx.remove('database_specific');
+        "
       }
     },
-    { "remove": { "field": "severity", "ignore_missing": true } },
     {
       "script": {
         "lang": "painless",
-        "description": "Extract CVE ID — first alias starting with CVE-",
-        "source": "def a = ctx['vulnerability.aliases']; if (a != null) { for (def x : a) { if (x.startsWith('CVE-')) { ctx['vulnerability.cve_id'] = x; break; } } }"
+        "description": "Extract CVE ID from aliases list",
+        "source": "
+          def a = ctx['vulnerability.aliases'];
+          if (a != null) {
+            for (def x : a) {
+              if (x.startsWith('CVE-')) {
+                ctx['vulnerability.cve_id'] = x;
+                break;
+              }
+            }
+          }
+        "
+      }
+    },
+    {
+      "script": {
+        "lang": "painless",
+        "description": "Extract CVSS vector and type from severity array (before it is removed)",
+        "source": "
+          if (ctx.severity != null && ctx.severity.length > 0) {
+            ctx['vulnerability.cvss_vector'] = ctx.severity[0].score;
+            ctx['vulnerability.cvss_type']   = ctx.severity[0].type;
+          }
+          ctx.remove('severity');
+        "
       }
     },
     {
       "script": {
         "lang": "painless",
         "description": "Flatten affected[] into deduplicated packages, purls, versions, fix versions",
-        "source": "if (ctx.affected == null) return; Set pkgs = new HashSet(); Set purls = new HashSet(); Set vers = new HashSet(); List fixes = new ArrayList(); Set fixSet = new HashSet(); for (def aff : ctx.affected) { def pkg = aff.get('package'); if (pkg != null) { if (pkg.name != null) pkgs.add(pkg.name); if (pkg.purl != null) purls.add(pkg.purl); } if (aff.versions != null) { for (def v : aff.versions) vers.add(v); } if (aff.ranges != null) { for (def r : aff.ranges) { if (r.type == 'ECOSYSTEM' && r.events != null) { for (def e : r.events) { if (e.containsKey('fixed') && !fixSet.contains(e.fixed)) { fixes.add(e.fixed); fixSet.add(e.fixed); } } } } } } ctx['vulnerability.affected_packages'] = new ArrayList(pkgs); ctx['vulnerability.affected_purls'] = new ArrayList(purls); ctx['vulnerability.vulnerable_versions'] = new ArrayList(vers); ctx['vulnerability.fix_versions'] = fixes; if (fixes.size() > 0) ctx['vulnerability.fix_version'] = fixes[0];"
+        "source": "
+          if (ctx.affected == null) return;
+          Set pkgs    = new HashSet();
+          Set purls   = new HashSet();
+          Set vers    = new HashSet();
+          List fixes  = new ArrayList();
+          Set fixSet  = new HashSet();
+
+          for (def aff : ctx.affected) {
+            def pkg = aff.get('package');
+            if (pkg != null) {
+              if (pkg.name != null) pkgs.add(pkg.name);
+              if (pkg.purl != null) purls.add(pkg.purl);
+            }
+            if (aff.versions != null) {
+              for (def v : aff.versions) vers.add(v);
+            }
+            if (aff.ranges != null) {
+              for (def r : aff.ranges) {
+                if ('ECOSYSTEM'.equals(r.type) && r.events != null) {
+                  for (def e : r.events) {
+                    if (e.containsKey('fixed') && !fixSet.contains(e.fixed)) {
+                      fixes.add(e.fixed);
+                      fixSet.add(e.fixed);
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          ctx['vulnerability.affected_packages']   = new ArrayList(pkgs);
+          ctx['vulnerability.affected_purls']      = new ArrayList(purls);
+          ctx['vulnerability.vulnerable_versions'] = new ArrayList(vers);
+          ctx['vulnerability.fix_versions']        = fixes;
+          if (fixes.size() > 0) ctx['vulnerability.fix_version'] = fixes[0];
+          ctx.remove('affected');
+        "
       }
     },
-    { "remove": { "field": "affected", "ignore_missing": true } },
     {
       "script": {
         "lang": "painless",
         "description": "Build purl_bases list — strip @version suffix for join key",
-        "source": "def purls = ctx['vulnerability.affected_purls']; if (purls == null) return; List bases = new ArrayList(); for (def p : purls) { int at = p.indexOf('@'); bases.add(at > 0 ? p.substring(0, at) : p); } ctx['vulnerability.purl_bases'] = bases;"
+        "source": "
+          def purls = ctx['vulnerability.affected_purls'];
+          if (purls == null) return;
+          List bases = new ArrayList();
+          for (def p : purls) {
+            int at = p.indexOf('@');
+            bases.add(at > 0 ? p.substring(0, at) : p);
+          }
+          ctx['vulnerability.purl_bases'] = bases;
+        "
       }
     },
     {
       "script": {
         "lang": "painless",
         "description": "Extract advisory and fix reference URLs only",
-        "source": "if (ctx.references == null) return; List adv = new ArrayList(); List fix = new ArrayList(); for (def r : ctx.references) { if ('ADVISORY'.equals(r.type)) adv.add(r.url); if ('FIX'.equals(r.type)) fix.add(r.url); } ctx['vulnerability.advisory_urls'] = adv; ctx['vulnerability.fix_urls'] = fix;"
+        "source": "
+          if (ctx.references == null) return;
+          List adv = new ArrayList();
+          List fix = new ArrayList();
+          for (def r : ctx.references) {
+            if ('ADVISORY'.equals(r.type)) adv.add(r.url);
+            if ('FIX'.equals(r.type))      fix.add(r.url);
+          }
+          ctx['vulnerability.advisory_urls'] = adv;
+          ctx['vulnerability.fix_urls']      = fix;
+          ctx.remove('references');
+        "
       }
     },
-    { "remove": { "field": "references", "ignore_missing": true } },
-    { "set": { "field": "vulnerability.ecosystem", "value": "Maven" } },
-    { "set": { "field": "@timestamp",    "value": "{{{vulnerability.modified_at}}}", "ignore_empty_value": true } },
-    { "set": { "field": "event.ingested","value": "{{{_ingest.timestamp}}}" } },
-    { "set": { "field": "event.kind",    "value": "enrichment" } },
-    { "set": { "field": "event.category","value": "vulnerability" } },
-    { "set": { "field": "event.type",    "value": "info" } },
-    { "remove": { "field": ["database_specific","related","schema_version","details","tags"], "ignore_missing": true } },
+    {
+      "script": {
+        "lang": "painless",
+        "description": "Set @timestamp and event.ingested as flat keys",
+        "source": "
+          def modified = ctx['vulnerability.modified_at'];
+          if (modified != null && !modified.isEmpty()) {
+            ctx['@timestamp'] = modified;
+          }
+          ctx['event.ingested'] = metadata().now;
+          ctx.remove('related');
+          ctx.remove('schema_version');
+          ctx.remove('details');
+          ctx.remove('tags');
+        "
+      }
+    },
     {
       "fingerprint": {
         "fields": ["vulnerability.id", "vulnerability.ecosystem"],

@@ -12,7 +12,7 @@ echo "  STEP 5 — security-sca-findings index"
 echo "═══════════════════════════════════════════"
 
 info "Creating index template: security-sca-findings-template"
-RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/_index_template/security-sca-findings-template" \
   -H "Content-Type: application/json" \
   -d @"$(dirname "$0")/../mappings/security-sca-findings.json")

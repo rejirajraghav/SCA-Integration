@@ -3,6 +3,7 @@
   "priority": 500,
   "template": {
     "settings": {
+      "index.mode": "logsdb",
       "number_of_shards": 1,
       "number_of_replicas": 1,
       "refresh_interval": "30s",

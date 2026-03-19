@@ -16,7 +16,7 @@ ES_HOST_ONLY=$(echo "${ES_HOST}" | sed 's|https://||' | cut -d: -f1)
 ES_PORT=$(echo "${ES_HOST}" | sed 's|.*:||')
 
 info "Creating watcher: osv-enrich-policy-refresh"
-RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+RES=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   -X PUT "${ES_HOST}/_watcher/watch/osv-enrich-policy-refresh" \
   -H "Content-Type: application/json" \
   -d "{
@@ -34,7 +34,7 @@ RES=$(curl -sf -u "elastic:${ES_PASSWORD}" \
           \"auth\": {
             \"basic\": {
               \"username\": \"elastic\",
-              \"password\": \"${ES_PASSWORD}\"
+              \"password\": \"${ES_API_KEY}\"
             }
           }
         }

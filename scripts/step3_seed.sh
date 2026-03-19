@@ -14,11 +14,19 @@ echo "════════════════════════�
 
 # Pull top 5 libraries from agent index
 info "Fetching top libraries from ${LIBRARY_INDEX}..."
-LIBS=$(curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/${LIBRARY_INDEX}/_search" \
+LIBS=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" "${ES_HOST}/${LIBRARY_INDEX}/_search" \
   -H "Content-Type: application/json" \
   -d '{
     "size": 0,
-    "query": { "term": { "event.action": "library-loaded" } },
+    "query": {
+      "bool": {
+        "must": [{ "term": { "event.action": "library-loaded" } }],
+        "must_not": [
+          { "term": { "library.group_id": "" } },
+          { "term": { "library.version":  "" } }
+        ]
+      }
+    },
     "aggs": {
       "libs": {
         "composite": {
@@ -71,11 +79,11 @@ while IFS= read -r lib; do
         }
       }" | jq -c '.vulns[]' | while IFS= read -r vuln; do
         VULN_ID=$(echo "$vuln" | jq -r '.id')
-        RESULT=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+        RESULT=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
           -X POST "${ES_HOST}/security-osv-vulns/_doc?pipeline=osv-vuln-ingest" \
           -H "Content-Type: application/json" \
           -d "${vuln}")
-        RESULT_VAL=$(echo "$RESULT" | jq -r '._result // .error.reason')
+        RESULT_VAL=$(echo "$RESULT" | jq -r '.result // .error.reason')
         echo "    ${VULN_ID}: ${RESULT_VAL}"
         TOTAL_SEEDED=$((TOTAL_SEEDED + 1))
       done
@@ -87,7 +95,7 @@ done < <(echo "$LIBS" | jq -c '.aggregations.libs.buckets[]')
 
 echo ""
 info "Verifying index..."
-COUNT=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+COUNT=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
   "${ES_HOST}/security-osv-vulns/_count" | jq .count)
 echo "Total docs in security-osv-vulns: ${COUNT}"
 
@@ -102,14 +110,14 @@ if [ "$COUNT" = "0" ] || [ "$COUNT" = "null" ]; then
     -d '{"version":"2.14.1","package":{"name":"org.apache.logging.log4j:log4j-core","ecosystem":"Maven"}}' \
     | jq -c '.vulns[]' | while IFS= read -r vuln; do
       VULN_ID=$(echo "$vuln" | jq -r '.id')
-      RESULT=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+      RESULT=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
         -X POST "${ES_HOST}/security-osv-vulns/_doc?pipeline=osv-vuln-ingest" \
         -H "Content-Type: application/json" \
         -d "${vuln}")
-      echo "  ${VULN_ID}: $(echo "$RESULT" | jq -r '._result')"
+      echo "  ${VULN_ID}: $(echo "$RESULT" | jq -r '.result')"
     done
 
-  COUNT=$(curl -sf -u "elastic:${ES_PASSWORD}" \
+  COUNT=$(curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" \
     "${ES_HOST}/security-osv-vulns/_count" | jq .count)
   echo "Total docs after fallback seed: ${COUNT}"
 fi
@@ -117,7 +125,7 @@ fi
 [ "$COUNT" = "0" ] && fail "security-osv-vulns is empty after seeding"
 
 info "Sample documents:"
-curl -sf -u "elastic:${ES_PASSWORD}" "${ES_HOST}/security-osv-vulns/_search" \
+curl -sf -H "Authorization: ApiKey ${ES_API_KEY}" "${ES_HOST}/security-osv-vulns/_search" \
   -H "Content-Type: application/json" \
   -d '{
     "size": 5,
